@@ -6,12 +6,16 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
-  // 部署前用 `wrangler d1 create todo-hub` 生成，把 database_id 填进来
+  // 只走自定义域名（受 Access 保护），关掉 workers.dev 和预览地址
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "todo.aumnertic.top", "custom_domain": true }],
+
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "todo-hub",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "af74eea6-f7b2-4a39-bfbd-5a1a48dd230f",
       "migrations_dir": "migrations"
     }
   ],
@@ -28,7 +32,7 @@
 
   "vars": {
     "ACCESS_TEAM_DOMAIN": "cool-hill-a857.cloudflareaccess.com",
-    "ACCESS_AUD": "",              // Access 应用的 AUD tag，部署时填
+    "ACCESS_AUD": "a413b5684936c41842da8d7287ffb4313481f7fc732ca6e37069217fef00ca19", // Access 应用 todo-hub
     "PUBLIC_URL": "https://todo.aumnertic.top",
     "MAIL_FROM": "todo@aumnertic.top",
     "DEV_AUTH": "0"                // 只有 .dev.vars 里设为 1，允许 X-Dev-Actor 头
