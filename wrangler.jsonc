@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "todo-hub",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // 部署前用 `wrangler d1 create todo-hub` 生成，把 database_id 填进来
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "todo-hub",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // review / 提问 / 每日汇总邮件。目标地址必须是 Email Routing 里已验证的地址
+  "send_email": [{ "name": "MAILER" }],
+
+  "triggers": {
+    "crons": [
+      "*/5 * * * *", // 回收过期租约
+      "0 1 * * *"    // 每日汇总（UTC 01:00 = 北京时间 09:00）
+    ]
+  },
+
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "cool-hill-a857.cloudflareaccess.com",
+    "ACCESS_AUD": "",              // Access 应用的 AUD tag，部署时填
+    "PUBLIC_URL": "https://todo.aumnertic.top",
+    "MAIL_FROM": "todo@aumnertic.top",
+    "DEV_AUTH": "0"                // 只有 .dev.vars 里设为 1，允许 X-Dev-Actor 头
+  }
+}
