@@ -11,6 +11,11 @@
   "preview_urls": false,
   "routes": [{ "pattern": "todo.aumnertic.top", "custom_domain": true }],
 
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "none"
+  },
+
   "d1_databases": [
     {
       "binding": "DB",

@@ -50,16 +50,20 @@ v1.get("/me", (c) => {
   return c.json({ id, kind, display_name, email });
 });
 
+v1.get("/actors", async (c) => c.json({ actors: await c.var.tasks.actors() }));
+
 v1.get("/tasks", async (c) => {
   const q = c.req.query();
-  const tasks = await c.var.tasks.list({
+  const filter = {
     status: parseStatuses(q.status),
     assignee: q.assignee === "none" ? null : q.assignee,
     project: q.project,
     created_by: q.created_by,
     claimable: q.claimable === "1" || q.claimable === "true",
     limit: q.limit ? Number(q.limit) : undefined,
-  });
+  };
+  const expand = q.expand === "1" || q.expand === "true";
+  const tasks = expand ? await c.var.tasks.listExpanded(filter) : await c.var.tasks.list(filter);
   return c.json({ tasks });
 });
 

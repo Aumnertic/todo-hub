@@ -223,6 +223,17 @@ export class Tasks {
     };
   }
 
+  async actors(): Promise<Pick<Actor, "id" | "kind" | "display_name">[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT id, kind, display_name FROM actors
+         WHERE active = 1 AND kind IN ('human', 'agent')
+         ORDER BY CASE kind WHEN 'human' THEN 0 ELSE 1 END, id`,
+      )
+      .all<Pick<Actor, "id" | "kind" | "display_name">>();
+    return results;
+  }
+
   async list(f: ListFilter = {}): Promise<Task[]> {
     const params: unknown[] = [];
     const p = (v: unknown) => {
@@ -246,6 +257,60 @@ export class Tasks {
                  ORDER BY ${order} LIMIT ${limit}`;
     const { results } = await this.db.prepare(sql).bind(...params).all<Task>();
     return results;
+  }
+
+  async listExpanded(f: ListFilter = {}): Promise<TaskDetail[]> {
+    const tasks = await this.list(f);
+    if (!tasks.length) return [];
+
+    const ids = tasks.map((t) => t.id);
+    const chunkSize = 80;
+    const stmts: D1PreparedStatement[] = [];
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const placeholders = chunk.map((_, idx) => `?${idx + 1}`).join(", ");
+      stmts.push(
+        this.db
+          .prepare(`SELECT task_id, depends_on FROM task_deps WHERE task_id IN (${placeholders}) ORDER BY depends_on`)
+          .bind(...chunk),
+        this.db
+          .prepare(`SELECT * FROM task_events WHERE task_id IN (${placeholders}) ORDER BY id`)
+          .bind(...chunk),
+        this.db
+          .prepare(`SELECT * FROM task_artifacts WHERE task_id IN (${placeholders}) ORDER BY id`)
+          .bind(...chunk),
+      );
+    }
+
+    const batchRes = await this.db.batch(stmts);
+    const depsMap = new Map<string, string[]>();
+    const eventsMap = new Map<string, TaskEvent[]>();
+    const artifactsMap = new Map<string, Artifact[]>();
+
+    for (let i = 0; i < batchRes.length; i += 3) {
+      for (const row of batchRes[i].results as { task_id: string; depends_on: string }[]) {
+        const arr = depsMap.get(row.task_id) ?? [];
+        arr.push(row.depends_on);
+        depsMap.set(row.task_id, arr);
+      }
+      for (const row of batchRes[i + 1].results as unknown as TaskEvent[]) {
+        const arr = eventsMap.get(row.task_id) ?? [];
+        arr.push(row);
+        eventsMap.set(row.task_id, arr);
+      }
+      for (const row of batchRes[i + 2].results as unknown as Artifact[]) {
+        const arr = artifactsMap.get(row.task_id) ?? [];
+        arr.push(row);
+        artifactsMap.set(row.task_id, arr);
+      }
+    }
+
+    return tasks.map((t) => ({
+      ...t,
+      depends_on: depsMap.get(t.id) ?? [],
+      events: eventsMap.get(t.id) ?? [],
+      artifacts: artifactsMap.get(t.id) ?? [],
+    }));
   }
 
   async create(input: TaskInput): Promise<Task> {

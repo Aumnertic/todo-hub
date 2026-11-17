@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TODO · 人与 Agent 共用的任务队列打卡纸</title>
+  <meta name="description" content="Todo Hub：人与多个 Agent 共用的任务队列打卡纸">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;500&family=Long+Cang&family=Noto+Serif+SC:wght@400;600;700;900&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- SVG 手绘墨迹滤镜（仅作用于线条、边框与标题轮廓） -->
+  <svg class="svg-defs" aria-hidden="true" width="0" height="0" focusable="false">
+    <defs>
+      <filter id="ink-wobble" x="-6%" y="-6%" width="112%" height="112%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+      <filter id="title-rough" x="-4%" y="-6%" width="108%" height="112%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="11" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="desk">
+    <div class="studio-workspace">
+      <!-- 左侧独立 Studio 工作台控制坞（与纸张分离） -->
+      <aside class="studio-dock" aria-label="Studio 纸张控制坞">
+        <div class="studio-head">
+          <span class="studio-kicker">STUDIO // SHEETS</span>
+          <span class="studio-sub" id="studio-sub">任务活页控制台</span>
+        </div>
+
+        <nav class="studio-sheet-list" id="index-tabs" aria-label="按分配切换活页纸"></nav>
+
+        <div class="studio-foot">
+          <div class="studio-hints">
+            <span><kbd>N</kbd> 新建</span>
+            <span><kbd>R</kbd> 刷新</span>
+            <span><kbd>[</kbd> <kbd>]</kbd> 翻页</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 右侧旋转叠放纸张舞台 -->
+      <div class="paper-stage">
+        <div class="sheet-stack" id="sheet-stack">
+          <!-- 动态渲染可点击边缘切换的旋转底层纸张 -->
+          <div class="under-sheets" id="under-sheets"></div>
+          <div class="sheet-ghost hidden" id="sheet-ghost" aria-hidden="true"></div>
+
+          <main class="sheet" id="sheet">
+            <!-- 纸张背景极淡水印点缀 -->
+            <div class="paper-doodles" aria-hidden="true">
+              <svg class="doodle-star" viewBox="0 0 32 32"><path d="M16 2 L19 13 L30 16 L19 19 L16 30 L13 19 L2 16 L13 13 Z"/></svg>
+              <svg class="doodle-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52"/></svg>
+            </div>
+
+            <!-- 纸页顶端三栏刊头 -->
+            <header class="masthead">
+              <div class="brand">
+                <div class="brand-top">
+                  <h1 class="wordmark" aria-label="TODO">
+                    <span class="wm-ch wm-1">T</span><span class="wm-ch wm-2">O</span><span class="wm-ch wm-3">D</span><span class="wm-ch wm-4">O</span>
+                  </h1>
+                  <span class="sheet-badge" id="sheet-badge">全部成员</span>
+                </div>
+                <p class="subtitle">人与 AGENT 共用的任务队列打卡纸</p>
+              </div>
+
+              <div class="stamp-area" aria-label="任务进度">
+                <div class="stamp-halo" aria-hidden="true"></div>
+                <div class="stamp-dot" aria-hidden="true"></div>
+                <div class="stamp-ring">
+                  <svg class="stamp-svg" viewBox="0 0 100 100" aria-hidden="true">
+                    <circle class="stamp-track" cx="50" cy="50" r="42"/>
+                    <circle class="stamp-arc" id="stamp-arc" cx="50" cy="50" r="42" stroke-dasharray="263.89" stroke-dashoffset="263.89"/>
+                  </svg>
+                  <div class="stamp-inner">
+                    <div class="stamp-ratio" id="stamp-ratio">0/0</div>
+                    <div class="stamp-caption">本页进度</div>
+                  </div>
+                </div>
+              </div>
+
+              <dl class="meta-table">
+                <div class="meta-row">
+                  <dt>日期</dt>
+                  <dd id="meta-date">--/--</dd>
+                </div>
+                <div class="meta-row">
+                  <dt>星期</dt>
+                  <dd id="meta-weekday">周-</dd>
+                </div>
+                <div class="meta-row">
+                  <dt>待办</dt>
+                  <dd class="meta-pending" id="meta-pending">0 项</dd>
+                </div>
+              </dl>
+            </header>
+
+            <div class="ink-rule" aria-hidden="true"></div>
+
+            <!-- 提示说明与当前纸张内筛选栏 -->
+            <section class="intro-band">
+              <p class="guide-note">
+                ※ 可在左侧 Studio 切换成员，或直接点露出的底层纸张边缘抽换纸页；标签与搜索仅过滤当前这张纸。
+              </p>
+
+              <div class="toolbar-top">
+                <div class="sync-status">
+                  <span class="sync-meta" id="sync-meta">(正在识别身份…)</span>
+                  <button type="button" class="text-btn" id="refresh-btn">刷新队列</button>
+                  <div class="dev-actor-wrap hidden" id="dev-actor-wrap">
+                    <button type="button" class="dev-actor-btn" id="dev-actor-btn" aria-haspopup="listbox" aria-expanded="false">
+                      视角: <span id="dev-actor-label">me</span> ▾
+                    </button>
+                    <div class="dev-actor-menu hidden" id="dev-actor-menu" role="listbox" aria-label="本地开发切换身份"></div>
+                  </div>
+                </div>
+
+                <div class="toolbar-actions">
+                  <input type="search" id="filter-search" class="paper-search" placeholder="在本页搜索…" aria-label="在当前纸张中搜索任务">
+                  <button type="button" class="stamp-btn" id="new-task-btn">+ 记一笔新任务</button>
+                </div>
+              </div>
+
+              <div class="project-pills" id="project-pills" role="tablist" aria-label="在当前纸张按项目筛选"></div>
+            </section>
+
+            <div class="dashed-rule" aria-hidden="true"></div>
+
+            <!-- 通知横幅 / 错误提示 -->
+            <div class="banner hidden" id="banner" role="status" aria-live="polite"></div>
+
+            <!-- 队列主体（等高分页容器） -->
+            <div class="sections" id="sections">
+              <div class="loading-sheet" id="loading-state">正在翻开今日打卡纸…</div>
+            </div>
+
+            <footer class="sheet-foot">
+              <span id="sheet-foot-meta">Todo Hub · Cloudflare Workers + D1</span>
+              <div class="sheet-pager" id="sheet-pager" aria-label="纸张内分页"></div>
+            </footer>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 纸张提示 Toast -->
+  <div class="toast-host" id="toast-host" aria-live="polite"></div>
+
+  <!-- 新建任务弹窗 -->
+  <div class="modal-backdrop hidden" id="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker">NEW ENTRY</span>
+          <h2 id="create-modal-title">记一笔新任务</h2>
+        </div>
+        <button type="button" class="close-btn" data-close="create-modal" aria-label="关闭">×</button>
+      </div>
+      <form id="create-form" class="modal-body">
+        <div class="field">
+          <label for="c-title">任务标题 <span class="req">*</span></label>
+          <input id="c-title" name="title" type="text" maxlength="200" required placeholder="简明写清要做什么…">
+        </div>
+
+        <div class="field">
+          <label for="c-project">所属项目</label>
+          <input id="c-project" name="project" type="text" maxlength="64" placeholder="输入新项目名，或直接点选下方已有项目…">
+          <div class="chip-row" id="c-project-chips"></div>
+        </div>
+
+        <div class="field">
+          <label>优先级</label>
+          <input id="c-priority" name="priority" type="hidden" value="2">
+          <div class="stamp-group" id="c-priority-group" role="radiogroup" aria-label="优先级">
+            <button type="button" class="stamp-opt" data-value="0">P0 · 紧急</button>
+            <button type="button" class="stamp-opt" data-value="1">P1 · 优先</button>
+            <button type="button" class="stamp-opt is-selected" data-value="2">P2 · 常规</button>
+            <button type="button" class="stamp-opt" data-value="3">P3 · 闲时</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>指派给</label>
+          <input id="c-assignee" name="assignee" type="hidden" value="">
+          <div class="stamp-group" id="c-assignee-group" role="radiogroup" aria-label="指派给"></div>
+        </div>
+
+        <div class="field">
+          <label for="c-due">截止时间（可选）</label>
+          <input id="c-due" name="due_at" type="datetime-local">
+        </div>
+
+        <div class="field">
+          <label for="c-desc">任务背景 / 详细说明</label>
+          <textarea id="c-desc" name="description" rows="3" maxlength="20000" placeholder="写清背景、相关仓库路径或上下文…"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="c-accept">验收标准</label>
+          <textarea id="c-accept" name="acceptance" rows="2" maxlength="5000" placeholder="做到什么程度算完成…"></textarea>
+        </div>
+
+        <div class="field">
+          <label>前置依赖（仅列出未完成任务，同项目已置顶）</label>
+          <div class="deps-box" id="c-deps-box">
+            <div class="deps-selected" id="c-deps-selected"></div>
+            <input type="search" class="deps-search" id="c-deps-search" placeholder="搜索未完成任务标题或项目…">
+            <div class="deps-picker" id="c-deps"></div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <span class="hint-text" id="create-role-hint"></span>
+          <div class="modal-actions">
+            <button type="button" class="paper-btn" data-close="create-modal">取消</button>
+            <button type="submit" class="stamp-btn" id="create-submit">写入清单</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 任务详情与编辑弹窗 -->
+  <div class="modal-backdrop hidden" id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-head">
+        <div class="detail-head-meta">
+          <div class="detail-id-row">
+            <span class="mono-id" id="d-id"></span>
+            <span class="status-badge" id="d-status-badge"></span>
+            <span class="version-badge" id="d-version"></span>
+          </div>
+          <h2 id="detail-modal-title">任务详情</h2>
+        </div>
+        <button type="button" class="close-btn" data-close="detail-modal" aria-label="关闭">×</button>
+      </div>
+
+      <div class="modal-body" id="detail-body">
+        <!-- 状态流转操作栏 -->
+        <div class="detail-actions-box" id="d-actions-box"></div>
+
+        <!-- 编辑字段表单 -->
+        <form id="edit-form" class="edit-section">
+          <div class="section-mini-head">
+            <span>任务内容与属性</span>
+            <span class="edit-perm-note" id="d-edit-note"></span>
+          </div>
+          <div class="field">
+            <label for="e-title">标题</label>
+            <input id="e-title" name="title" type="text" maxlength="200" required>
+          </div>
+
+          <div class="field">
+            <label for="e-project">项目</label>
+            <input id="e-project" name="project" type="text" maxlength="64" placeholder="留空表示未分类">
+            <div class="chip-row" id="e-project-chips"></div>
+          </div>
+
+          <div class="field">
+            <label>优先级</label>
+            <input id="e-priority" name="priority" type="hidden" value="2">
+            <div class="stamp-group" id="e-priority-group" role="radiogroup" aria-label="优先级">
+              <button type="button" class="stamp-opt" data-value="0">P0 · 紧急</button>
+              <button type="button" class="stamp-opt" data-value="1">P1 · 优先</button>
+              <button type="button" class="stamp-opt" data-value="2">P2 · 常规</button>
+              <button type="button" class="stamp-opt" data-value="3">P3 · 闲时</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>指派给</label>
+            <input id="e-assignee" name="assignee" type="hidden" value="">
+            <div class="stamp-group" id="e-assignee-group" role="radiogroup" aria-label="指派给"></div>
+          </div>
+
+          <div class="field">
+            <label for="e-due">截止时间</label>
+            <input id="e-due" name="due_at" type="datetime-local">
+          </div>
+
+          <div class="field">
+            <label for="e-desc">背景说明</label>
+            <textarea id="e-desc" name="description" rows="4" maxlength="20000"></textarea>
+          </div>
+          <div class="field">
+            <label for="e-accept">验收标准</label>
+            <textarea id="e-accept" name="acceptance" rows="2" maxlength="5000"></textarea>
+          </div>
+
+          <div class="field">
+            <label>前置依赖（同项目未完成任务已置顶）</label>
+            <div class="deps-box" id="e-deps-box">
+              <div class="deps-selected" id="e-deps-selected"></div>
+              <input type="search" class="deps-search" id="e-deps-search" placeholder="搜索未完成任务标题或项目…">
+              <div class="deps-picker" id="e-deps"></div>
+            </div>
+          </div>
+
+          <div class="edit-save-row" id="d-edit-save-row">
+            <span class="hint-text" id="d-lease-info"></span>
+            <button type="submit" class="paper-btn paper-btn-ink" id="e-save-btn">保存修改</button>
+          </div>
+        </form>
+
+        <div class="dashed-rule"></div>
+
+        <!-- 交付物列表与追加 -->
+        <section class="detail-sub">
+          <div class="section-mini-head">
+            <span>交付物链接（Artifacts）</span>
+          </div>
+          <ul class="artifact-list" id="d-artifacts"></ul>
+          <form id="artifact-form" class="inline-add-form hidden">
+            <input id="a-kind" type="hidden" value="pr">
+            <div class="stamp-group stamp-group-sm" id="a-kind-group" role="radiogroup" aria-label="交付物类型">
+              <button type="button" class="stamp-opt is-selected" data-value="pr">PR</button>
+              <button type="button" class="stamp-opt" data-value="commit">Commit</button>
+              <button type="button" class="stamp-opt" data-value="preview">预览</button>
+              <button type="button" class="stamp-opt" data-value="url">链接</button>
+            </div>
+            <input id="a-url" type="url" required placeholder="https://...">
+            <input id="a-note" type="text" placeholder="备注（可选）">
+            <button type="submit" class="paper-btn">追加链接</button>
+          </form>
+        </section>
+
+        <div class="dashed-rule"></div>
+
+        <!-- 事件时间线与回复/评论 -->
+        <section class="detail-sub">
+          <div class="section-mini-head">
+            <span>事件流与留言记录</span>
+          </div>
+          <ul class="event-timeline" id="d-events"></ul>
+          <form id="comment-form" class="comment-form">
+            <textarea id="comment-input" rows="2" maxlength="10000" required placeholder="写下补充说明、回复或讨论…"></textarea>
+            <div class="comment-form-foot">
+              <span class="hint-text" id="comment-hint"></span>
+              <button type="submit" class="stamp-btn" id="comment-submit">发表留言</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

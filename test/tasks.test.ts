@@ -234,4 +234,31 @@ describe("dependencies & edits", () => {
     expect((await grok.get("/v1/tasks?claimable=1")).json.tasks).toHaveLength(1);
     expect((await me.get("/v1/tasks?status=bogus")).status).toBe(400);
   });
+
+  it("lists active actors and expanded tasks", async () => {
+    const actorsRes = await me.get("/v1/actors");
+    expect(actorsRes.status).toBe(200);
+    expect(actorsRes.json.actors.map((a: { id: string }) => a.id)).toEqual(["me", "grok", "muse"]);
+
+    expect((await me.get("/v1/tasks?expand=1")).json.tasks).toEqual([]);
+
+    const dep = await newTask({ title: "first" });
+    const child = await newTask({ title: "second", depends_on: [dep.id] });
+    expect((await me.post(`/v1/tasks/${dep.id}/complete`)).status).toBe(200);
+    expect((await muse.post(`/v1/tasks/${child.id}/claim`)).status).toBe(200);
+    expect(
+      (
+        await muse.post(`/v1/tasks/${child.id}/submit`, {
+          summary: "ready",
+          artifacts: [{ kind: "pr", url: "https://github.com/a/b/pull/1" }],
+        })
+      ).status,
+    ).toBe(200);
+
+    const expanded = (await me.get("/v1/tasks?expand=1&limit=50")).json.tasks;
+    const foundChild = expanded.find((t: { id: string }) => t.id === child.id);
+    expect(foundChild.depends_on).toEqual([dep.id]);
+    expect(foundChild.artifacts).toHaveLength(1);
+    expect(foundChild.events.map((e: { type: string }) => e.type)).toEqual(["created", "claimed", "submitted"]);
+  });
 });

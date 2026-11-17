@@ -52,7 +52,7 @@ async function send(env: Env, subject: string, text: string) {
   }
 }
 
-const link = (env: Env, t: Task) => `${env.PUBLIC_URL}/v1/tasks/${t.id}`;
+const link = (env: Env, t: Task) => `${env.PUBLIC_URL}/?task=${t.id}`;
 const line = (env: Env, t: Task) => `- [${t.project ?? "-"}] ${t.title}  (P${t.priority})\n  ${link(env, t)}`;
 
 export function sendNotice(env: Env, n: Notice): Promise<void> {
