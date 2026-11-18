@@ -234,7 +234,7 @@ body {
 /* ---- 右侧旋转纸张叠放舞台 ---- */
 .paper-stage {
   flex: 0 0 auto;
-  padding: 12px 40px 44px;
+  padding: 12px 112px 44px 12px;
 }
 
 .sheet-stack {
@@ -268,7 +268,7 @@ body {
     );
 }
 
-/* 旋转式叠放的底层可点击纸张 */
+/* 旋转式叠放的底层可点击纸张（以左下角为轴向右侧顺时针扇形展开，左侧不露出） */
 .under-sheet {
   appearance: none;
   position: absolute;
@@ -279,6 +279,7 @@ body {
   cursor: pointer;
   overflow: hidden;
   text-align: left;
+  transform-origin: 0% 100%;
   transition:
     transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
@@ -299,47 +300,47 @@ body {
 .under-sheet.layer-1 {
   z-index: 9;
   background-color: #f3ede0;
-  transform: translate(26px, 12px) rotate(2.8deg);
+  transform: translate(14px, 6px) rotate(1.8deg);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48);
 }
 
 .under-sheet.layer-1:hover {
-  transform: translate(34px, 6px) rotate(3.4deg);
+  transform: translate(22px, 3px) rotate(2.2deg);
   background-color: #f7f1e5;
 }
 
 .under-sheet.layer-2 {
   z-index: 8;
   background-color: #ebe2d0;
-  transform: translate(-24px, 16px) rotate(-2.7deg);
+  transform: translate(26px, 12px) rotate(3.5deg);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.48);
 }
 
 .under-sheet.layer-2:hover {
-  transform: translate(-32px, 10px) rotate(-3.3deg);
+  transform: translate(35px, 8px) rotate(4.0deg);
   background-color: #f0e8d7;
 }
 
 .under-sheet.layer-3 {
   z-index: 7;
   background-color: #e2d8c5;
-  transform: translate(34px, 24px) rotate(5.0deg);
+  transform: translate(38px, 18px) rotate(5.2deg);
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.5);
 }
 
 .under-sheet.layer-3:hover {
-  transform: translate(41px, 30px) rotate(5.6deg);
+  transform: translate(47px, 14px) rotate(5.8deg);
   background-color: #e8dfd0;
 }
 
-/* 露出边缘的成员角标（点击整张暴露纸缘均可切换） */
+/* 露出右侧边缘的成员角标（点击整张暴露纸缘均可切换） */
 .under-sheet-tag {
   position: absolute;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 7px;
-  background: rgba(250, 246, 238, 0.9);
+  padding: 5px 6px;
+  background: rgba(250, 246, 238, 0.92);
   border: 1px dashed var(--rule);
   border-radius: 2px;
   font-family: var(--serif);
@@ -347,24 +348,27 @@ body {
   color: var(--ink-2);
   white-space: nowrap;
   pointer-events: none;
+  writing-mode: vertical-rl;
   transition: border-color 0.2s, color 0.2s, background-color 0.2s;
 }
 
 .under-sheet.layer-1 .under-sheet-tag {
-  top: 26px;
-  right: 8px;
-  writing-mode: vertical-rl;
+  top: 28px;
+  right: 7px;
+  left: auto;
 }
 
 .under-sheet.layer-2 .under-sheet-tag {
-  top: 30px;
-  left: 8px;
-  writing-mode: vertical-rl;
+  top: 148px;
+  right: 7px;
+  left: auto;
 }
 
 .under-sheet.layer-3 .under-sheet-tag {
-  bottom: 9px;
-  right: 28px;
+  top: 268px;
+  right: 7px;
+  bottom: auto;
+  left: auto;
 }
 
 .under-sheet:hover .under-sheet-tag {
@@ -382,11 +386,11 @@ body {
 }
 
 .sheet-stack.is-switching .under-sheet.layer-1 {
-  transform: translate(32px, 16px) rotate(3.4deg);
+  transform: translate(20px, 9px) rotate(2.3deg);
 }
 
 .sheet-stack.is-switching .under-sheet.layer-2 {
-  transform: translate(-28px, 20px) rotate(-3.2deg);
+  transform: translate(33px, 15px) rotate(4.1deg);
 }
 
 /* 顶层活页打卡纸与切页残影 */
@@ -2144,23 +2148,27 @@ button.sub-link {
 /* ---- 中屏与窄屏响应式（保证所有纸张维持严格等长等宽） ---- */
 @media (max-width: 1240px) and (min-width: 960px) {
   :root {
-    --sheet-w: min(800px, calc(100vw - 320px));
+    --sheet-w: min(760px, calc(100vw - 380px));
     --sheet-h: 780px;
   }
 
   .studio-workspace {
-    gap: 44px;
+    gap: 36px;
   }
 
   .studio-dock {
     flex: 0 0 184px;
     width: 184px;
   }
+
+  .paper-stage {
+    padding: 12px 92px 44px 8px;
+  }
 }
 
 @media (max-width: 959px) {
   :root {
-    --sheet-w: calc(100vw - 44px);
+    --sheet-w: calc(100vw - 74px);
     --sheet-h: 700px;
   }
 
@@ -2207,16 +2215,16 @@ button.sub-link {
   }
 
   .paper-stage {
-    padding: 4px 12px 24px;
+    padding: 4px 44px 24px 8px;
   }
 
-  .under-sheet.layer-1 { transform: translate(11px, 7px) rotate(1.7deg); }
-  .under-sheet.layer-2 { transform: translate(-10px, 9px) rotate(-1.6deg); }
-  .under-sheet.layer-3 { transform: translate(15px, 14px) rotate(2.8deg); }
+  .under-sheet.layer-1 { transform: translate(8px, 4px) rotate(1.2deg); }
+  .under-sheet.layer-2 { transform: translate(16px, 8px) rotate(2.4deg); }
+  .under-sheet.layer-3 { transform: translate(24px, 12px) rotate(3.6deg); }
 
-  .under-sheet.layer-1 .under-sheet-tag { top: 14px; right: 3px; font-size: 10.5px; }
-  .under-sheet.layer-2 .under-sheet-tag { top: 14px; left: 3px; font-size: 10.5px; }
-  .under-sheet.layer-3 .under-sheet-tag { bottom: 4px; right: 14px; font-size: 10.5px; }
+  .under-sheet.layer-1 .under-sheet-tag { top: 18px; right: 3px; font-size: 10.5px; }
+  .under-sheet.layer-2 .under-sheet-tag { top: 112px; right: 3px; font-size: 10.5px; }
+  .under-sheet.layer-3 .under-sheet-tag { top: 206px; right: 3px; font-size: 10.5px; }
 
   .sheet,
   .sheet-ghost {
