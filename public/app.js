@@ -28,7 +28,33 @@ const EVENT_LABELS = {
 
 const AGENT_ACCENTS = ["#5b8ec9", "#4f9a6e", "#7689c7", "#c4843d"];
 const STAMP_CIRCUMFERENCE = 2 * Math.PI * 42;
-const IS_LOCAL_DEV = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+const IS_DEMO_MODE =
+  location.hostname.endsWith(".github.io") ||
+  new URLSearchParams(location.search).get("demo") === "1";
+const IS_LOCAL_DEV =
+  !IS_DEMO_MODE &&
+  (location.hostname === "localhost" || location.hostname === "127.0.0.1");
+const CAN_SWITCH_ACTOR = IS_LOCAL_DEV || IS_DEMO_MODE;
+const DEMO_STORAGE_KEY = "todo-hub-demo-v1";
+
+function getStoredActor() {
+  try {
+    if (IS_DEMO_MODE) return sessionStorage.getItem("todo-demo-actor") || "me";
+    if (IS_LOCAL_DEV) return localStorage.getItem("todo-dev-actor") || "me";
+  } catch {
+    return "me";
+  }
+  return null;
+}
+
+function setStoredActor(id) {
+  try {
+    if (IS_DEMO_MODE) sessionStorage.setItem("todo-demo-actor", id);
+    else if (IS_LOCAL_DEV) localStorage.setItem("todo-dev-actor", id);
+  } catch {
+    // ignore storage restrictions
+  }
+}
 
 const state = {
   me: null,
@@ -47,7 +73,7 @@ const state = {
   detailTask: null,
   inlinePanels: new Map(),
   switchTimer: null,
-  devActor: IS_LOCAL_DEV ? localStorage.getItem("todo-dev-actor") || "me" : null,
+  devActor: getStoredActor(),
 };
 
 const $ = (id) => document.getElementById(id);
@@ -203,7 +229,708 @@ function formatLeaseRemaining(leaseUntil) {
   return `剩 ${mins}m`;
 }
 
+let demoMemoryStore = null;
+
+function demoId(prefix = "01DEMO") {
+  return `${prefix}${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
+function createDemoSeed() {
+  const now = Date.now();
+  const min = 60_000;
+  const hr = 3600_000;
+  const day = 86400_000;
+
+  const actors = [
+    { id: "me", kind: "human", display_name: "Me" },
+    { id: "grok-bot", kind: "agent", display_name: "Grok bot" },
+    { id: "memoh", kind: "agent", display_name: "Memoh" },
+    { id: "muse", kind: "agent", display_name: "Muse" },
+  ];
+
+  const tasks = [
+    {
+      id: "01DEMO_REVIEW_BLOG_CODE",
+      title: "修复代码块行号对齐与深色配色对比度",
+      description: "文章页长代码块在移动端横向滚动时行号与代码行轻微错位，且注释文本对比度偏低。",
+      acceptance: "桌面与移动端行号完全对齐，Shiki 注释文字在代码底色上对比度 >= 4.5:1。",
+      project: "blog",
+      priority: 1,
+      status: "review",
+      assignee: "muse",
+      created_by: "me",
+      claimed_by: "muse",
+      lease_until: null,
+      due_at: null,
+      version: 3,
+      created_at: now - 5 * hr,
+      updated_at: now - 14 * min,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [
+        {
+          id: "art-1",
+          task_id: "01DEMO_REVIEW_BLOG_CODE",
+          kind: "pr",
+          url: "https://github.com/Aumnertic/todo-hub",
+          note: "fix/code-block-contrast (#42)",
+          created_by: "muse",
+          created_at: now - 14 * min,
+        },
+      ],
+      events: [
+        { id: "ev-1", task_id: "01DEMO_REVIEW_BLOG_CODE", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 5 * hr },
+        { id: "ev-2", task_id: "01DEMO_REVIEW_BLOG_CODE", actor: "muse", type: "claimed", from_status: "todo", to_status: "claimed", body: null, created_at: now - 48 * min },
+        { id: "ev-3", task_id: "01DEMO_REVIEW_BLOG_CODE", actor: "muse", type: "submitted", from_status: "claimed", to_status: "review", body: "已改为 CSS Grid 双列行号布局并调亮注释 token，已通过本地截图回归。", created_at: now - 14 * min },
+      ],
+    },
+    {
+      id: "01DEMO_BLOCKED_HOMEPAGE",
+      title: "主页 now.txt 数据同步的触发防抖策略确认",
+      description: "需要将 now.txt 状态写入 D1 后自动触发静态站 Deploy Hook。",
+      acceptance: "避免连续编辑 3 个字段时短时间内触发多次重构建。",
+      project: "homepage",
+      priority: 1,
+      status: "blocked",
+      assignee: "grok-bot",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 2,
+      created_at: now - 6 * hr,
+      updated_at: now - 28 * min,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-4", task_id: "01DEMO_BLOCKED_HOMEPAGE", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 6 * hr },
+        { id: "ev-5", task_id: "01DEMO_BLOCKED_HOMEPAGE", actor: "grok-bot", type: "claimed", from_status: "todo", to_status: "claimed", body: null, created_at: now - 40 * min },
+        { id: "ev-6", task_id: "01DEMO_BLOCKED_HOMEPAGE", actor: "grok-bot", type: "blocked", from_status: "claimed", to_status: "blocked", body: "你更倾向在 Worker 里做 60 秒合并防抖后自动发布，还是保留一个手动点发布的按钮？", created_at: now - 28 * min },
+      ],
+    },
+    {
+      id: "01DEMO_PROPOSED_SEARCH",
+      title: "为 /v1/tasks 接口补充全文关键字检索参数",
+      description: "轮询扫描时发现任务增多后，客户端全量拉取再过滤会增大带宽开销，建议服务端支持 ?q= 模糊匹配标题与描述。",
+      acceptance: "GET /v1/tasks?q=关键词 可配合 status / project 组合过滤并附单元测试。",
+      project: "todo-hub",
+      priority: 2,
+      status: "proposed",
+      assignee: null,
+      created_by: "memoh",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 1,
+      created_at: now - 3 * hr,
+      updated_at: now - 3 * hr,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-7", task_id: "01DEMO_PROPOSED_SEARCH", actor: "memoh", type: "created", from_status: null, to_status: "proposed", body: null, created_at: now - 3 * hr },
+      ],
+    },
+    {
+      id: "01DEMO_CLAIMED_MCP",
+      title: "为 MCP 工具补充结构化错误码与重试提示",
+      description: "当 Agent 遇到 version_conflict 或 blocked_by_deps 时，返回更明确的可恢复指引。",
+      acceptance: "mcp.test.ts 覆盖冲突与前置依赖拦截的返回值断言。",
+      project: "todo-hub",
+      priority: 1,
+      status: "claimed",
+      assignee: "muse",
+      created_by: "me",
+      claimed_by: "muse",
+      lease_until: now + 22 * min,
+      due_at: null,
+      version: 2,
+      created_at: now - 8 * hr,
+      updated_at: now - 8 * min,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-8", task_id: "01DEMO_CLAIMED_MCP", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 8 * hr },
+        { id: "ev-9", task_id: "01DEMO_CLAIMED_MCP", actor: "muse", type: "claimed", from_status: "todo", to_status: "claimed", body: null, created_at: now - 8 * min },
+      ],
+    },
+    {
+      id: "01DEMO_HP_STEP1",
+      title: "主页静态重构 ①：抽离本地 JSON 数据模板",
+      description: "将 now.txt 与 stack.toml 区块拆为模板占位符，支持 build.mjs 静态生成。",
+      acceptance: "运行 node build.mjs 可生成完整 dist/index.html。",
+      project: "homepage",
+      priority: 1,
+      status: "todo",
+      assignee: "me",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: now + 2 * day,
+      version: 1,
+      created_at: now - 1 * day,
+      updated_at: now - 1 * day,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-10", task_id: "01DEMO_HP_STEP1", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 1 * day },
+      ],
+    },
+    {
+      id: "01DEMO_HP_STEP2",
+      title: "主页静态重构 ②：接入 D1 只读构建数据源",
+      description: "构建脚本改为通过 Cloudflare D1 REST API 拉取最新数据并注入静态页。",
+      acceptance: "Pages 构建环境注入只读 Token 后可零停机更新主页内容。",
+      project: "homepage",
+      priority: 2,
+      status: "todo",
+      assignee: "grok-bot",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 1,
+      created_at: now - 23 * hr,
+      updated_at: now - 23 * hr,
+      closed_at: null,
+      depends_on: ["01DEMO_HP_STEP1"],
+      artifacts: [],
+      events: [
+        { id: "ev-11", task_id: "01DEMO_HP_STEP2", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 23 * hr },
+      ],
+    },
+    {
+      id: "01DEMO_HP_STEP3",
+      title: "主页静态重构 ③：配置 Deploy Hook 自动发布",
+      description: "数据变更后自动 POST Deploy Hook 触发重新部署。",
+      acceptance: "更新一条 now 状态后 30 秒内线上主页刷新生效。",
+      project: "homepage",
+      priority: 2,
+      status: "todo",
+      assignee: "memoh",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 1,
+      created_at: now - 22 * hr,
+      updated_at: now - 22 * hr,
+      closed_at: null,
+      depends_on: ["01DEMO_HP_STEP2"],
+      artifacts: [],
+      events: [
+        { id: "ev-12", task_id: "01DEMO_HP_STEP3", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 22 * hr },
+      ],
+    },
+    {
+      id: "01DEMO_TODO_INLINE",
+      title: "探索纸面原位即点即改（去表单化编辑）",
+      description: "双击任务标题直接进入行内改字，点击标签弹出小印章面板秒改优先级与指派人。",
+      acceptance: "常用改标题、调优先级操作不需要再打开弹窗。",
+      project: "todo-hub",
+      priority: 2,
+      status: "todo",
+      assignee: "me",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 1,
+      created_at: now - 16 * hr,
+      updated_at: now - 16 * hr,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-13", task_id: "01DEMO_TODO_INLINE", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 16 * hr },
+      ],
+    },
+    {
+      id: "01DEMO_BLOG_AI",
+      title: "文章发布后用 Workers AI 自动生成双语摘要",
+      description: "在文章构建或评论 Worker 中调用摘要模型生成 120 字导语。",
+      acceptance: "新发布文章自动生成摘要并回填 frontmatter。",
+      project: "blog",
+      priority: 2,
+      status: "todo",
+      assignee: null,
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 1,
+      created_at: now - 12 * hr,
+      updated_at: now - 12 * hr,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-14", task_id: "01DEMO_BLOG_AI", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 12 * hr },
+      ],
+    },
+    {
+      id: "01DEMO_HD2D_SHADER",
+      title: "HD-2D 像素场景渲染引擎：搭建 wgpu 景深后处理管线",
+      description: "在 Rust + wgpu 渲染管线中加入 tilt-shift 倾斜移轴景深与像素对齐采样。",
+      acceptance: "60fps 下渲染像素网格无亚像素闪烁。",
+      project: "hd2d-engine",
+      priority: 3,
+      status: "todo",
+      assignee: "me",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 1,
+      created_at: now - 2 * day,
+      updated_at: now - 2 * day,
+      closed_at: null,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-15", task_id: "01DEMO_HD2D_SHADER", actor: "me", type: "created", from_status: null, to_status: "todo", body: null, created_at: now - 2 * day },
+      ],
+    },
+    {
+      id: "01DEMO_DONE_UI",
+      title: "Todo Hub 手帐活页打卡纸前端界面与 GitHub Pages 展示分流",
+      description: "Studio & Paper 分离工作台、右侧扇形旋转纸张叠放、页内自动分页与演示沙盒。",
+      acceptance: "生产版走 D1 + Access，GitHub Pages 展示版自动切换本地交互沙盒。",
+      project: "todo-hub",
+      priority: 1,
+      status: "done",
+      assignee: "me",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 4,
+      created_at: now - 3 * day,
+      updated_at: now - 1 * hr,
+      closed_at: now - 1 * hr,
+      depends_on: [],
+      artifacts: [
+        {
+          id: "art-2",
+          task_id: "01DEMO_DONE_UI",
+          kind: "preview",
+          url: "https://github.com/Aumnertic/todo-hub",
+          note: "Aumnertic/todo-hub",
+          created_by: "me",
+          created_at: now - 1 * hr,
+        },
+      ],
+      events: [
+        { id: "ev-16", task_id: "01DEMO_DONE_UI", actor: "me", type: "completed", from_status: "todo", to_status: "done", body: "已完成上线并接入 Cloudflare Workers Builds。", created_at: now - 1 * hr },
+      ],
+    },
+    {
+      id: "01DEMO_DONE_MCP",
+      title: "接入 Cloudflare Access Service Token 与 Streamable HTTP MCP",
+      description: "让 Muse、Grok bot 与 Memoh 定时轮询 claim-next 自动领取并汇报任务。",
+      acceptance: "humanOnly 工具对 Agent 不可见，租约超时自动回队。",
+      project: "todo-hub",
+      priority: 1,
+      status: "done",
+      assignee: "me",
+      created_by: "me",
+      claimed_by: null,
+      lease_until: null,
+      due_at: null,
+      version: 2,
+      created_at: now - 5 * day,
+      updated_at: now - 4 * day,
+      closed_at: now - 4 * day,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-17", task_id: "01DEMO_DONE_MCP", actor: "me", type: "completed", from_status: "todo", to_status: "done", body: null, created_at: now - 4 * day },
+      ],
+    },
+    {
+      id: "01DEMO_DONE_BLOG",
+      title: "博客上线 Cloudflare Workers + D1 评论区与邮件提醒",
+      description: "零第三方脚本的轻量评论系统。",
+      acceptance: "评论提交后自动发送审核与回复通知。",
+      project: "blog",
+      priority: 2,
+      status: "done",
+      assignee: "muse",
+      created_by: "me",
+      claimed_by: "muse",
+      lease_until: null,
+      due_at: null,
+      version: 3,
+      created_at: now - 6 * day,
+      updated_at: now - 5 * day,
+      closed_at: now - 5 * day,
+      depends_on: [],
+      artifacts: [],
+      events: [
+        { id: "ev-18", task_id: "01DEMO_DONE_BLOG", actor: "muse", type: "submitted", from_status: "claimed", to_status: "review", body: "部署完成并验证邮件投递。", created_at: now - 5 * day - hr },
+        { id: "ev-19", task_id: "01DEMO_DONE_BLOG", actor: "me", type: "approved", from_status: "review", to_status: "done", body: null, created_at: now - 5 * day },
+      ],
+    },
+  ];
+
+  return { actors, tasks };
+}
+
+function loadDemoStore() {
+  if (demoMemoryStore) return demoMemoryStore;
+  try {
+    const raw = sessionStorage.getItem(DEMO_STORAGE_KEY);
+    if (raw) {
+      demoMemoryStore = JSON.parse(raw);
+      return demoMemoryStore;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  demoMemoryStore = createDemoSeed();
+  saveDemoStore(demoMemoryStore);
+  return demoMemoryStore;
+}
+
+function saveDemoStore(store) {
+  demoMemoryStore = store;
+  try {
+    sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function resetDemoStore() {
+  demoMemoryStore = createDemoSeed();
+  saveDemoStore(demoMemoryStore);
+  return demoMemoryStore;
+}
+
+function demoError(status, code, message, task) {
+  const err = new Error(message);
+  err.status = status;
+  err.code = code;
+  if (task) err.task = task;
+  throw err;
+}
+
+async function demoApi(path, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+  const url = new URL(path, "https://demo.local");
+  const pathname = url.pathname;
+  const body = options.body || {};
+  const headers = options.headers || {};
+
+  const store = loadDemoStore();
+  const actorId = state.devActor || "me";
+  const actor = store.actors.find((a) => a.id === actorId) || store.actors[0];
+  const isHuman = actor.kind === "human";
+  const now = Date.now();
+  const clone = (v) => structuredClone(v);
+
+  const findTask = (id) => {
+    const t = store.tasks.find((x) => x.id === id);
+    if (!t) demoError(404, "not_found", `task ${id} not found`);
+    return t;
+  };
+
+  const pushEvent = (t, type, fromStatus, toStatus, evBody = null) => {
+    t.events.push({
+      id: demoId("EV"),
+      task_id: t.id,
+      actor: actor.id,
+      type,
+      from_status: fromStatus,
+      to_status: toStatus,
+      body: evBody,
+      created_at: now,
+    });
+  };
+
+  if (method === "GET" && pathname === "/v1/me") {
+    return clone({ id: actor.id, kind: actor.kind, display_name: actor.display_name, email: null });
+  }
+
+  if (method === "GET" && pathname === "/v1/actors") {
+    return clone({ actors: store.actors });
+  }
+
+  if (method === "GET" && pathname === "/v1/tasks") {
+    return clone({ tasks: store.tasks });
+  }
+
+  if (method === "POST" && pathname === "/v1/tasks") {
+    const title = String(body.title || "").trim();
+    if (!title) demoError(400, "bad_request", "title is required");
+    const status = isHuman ? "todo" : "proposed";
+    const created = {
+      id: demoId("01DEMO"),
+      title,
+      description: String(body.description || ""),
+      acceptance: String(body.acceptance || ""),
+      project: body.project ? String(body.project).trim() : null,
+      priority: Number.isInteger(body.priority) ? body.priority : 2,
+      status,
+      assignee: body.assignee || null,
+      created_by: actor.id,
+      claimed_by: null,
+      lease_until: null,
+      due_at: body.due_at ? Date.parse(body.due_at) || null : null,
+      version: 1,
+      created_at: now,
+      updated_at: now,
+      closed_at: null,
+      depends_on: Array.isArray(body.depends_on) ? [...new Set(body.depends_on)] : [],
+      artifacts: [],
+      events: [],
+    };
+    pushEvent(created, "created", null, status, null);
+    store.tasks.unshift(created);
+    saveDemoStore(store);
+    return clone(created);
+  }
+
+  const singleMatch = pathname.match(/^\/v1\/tasks\/([^/]+)$/);
+  if (singleMatch) {
+    const t = findTask(singleMatch[1]);
+    if (method === "GET") return clone(t);
+    if (method === "PATCH") {
+      const ownProposal = t.status === "proposed" && t.created_by === actor.id;
+      if (!isHuman && !ownProposal) demoError(403, "forbidden", "agents can only edit their own proposed tasks", t);
+      const ifMatch = headers instanceof Headers ? headers.get("If-Match") : headers["If-Match"];
+      const reqVer = ifMatch ? Number(String(ifMatch).replace(/"/g, "")) : body.version;
+      if (reqVer !== t.version) demoError(409, "version_conflict", `task was modified (version is ${t.version})`, clone(t));
+
+      const beforeStatus = t.status;
+      if (body.title !== undefined) t.title = String(body.title).trim();
+      if (body.description !== undefined) t.description = String(body.description);
+      if (body.acceptance !== undefined) t.acceptance = String(body.acceptance);
+      if (body.project !== undefined) t.project = body.project ? String(body.project).trim() : null;
+      if (body.priority !== undefined) t.priority = Number(body.priority);
+      if (body.due_at !== undefined) t.due_at = body.due_at ? Date.parse(body.due_at) || null : null;
+      if (body.depends_on !== undefined) t.depends_on = [...new Set(body.depends_on)];
+      if (body.assignee !== undefined) {
+        t.assignee = body.assignee || null;
+        if (t.status === "claimed" && t.assignee && t.claimed_by !== t.assignee) {
+          t.status = "todo";
+          t.claimed_by = null;
+          t.lease_until = null;
+        }
+      }
+      t.version += 1;
+      t.updated_at = now;
+      pushEvent(t, "edited", beforeStatus, t.status, Object.keys(body).join(", "));
+      saveDemoStore(store);
+      return clone(t);
+    }
+  }
+
+  const actionMatch = pathname.match(/^\/v1\/tasks\/([^/]+)\/([a-z-]+)$/);
+  if (actionMatch && method === "POST") {
+    const t = findTask(actionMatch[1]);
+    const action = actionMatch[2];
+    const prev = t.status;
+
+    const hasOpenDeps = () =>
+      (t.depends_on || []).some((depId) => {
+        const dep = store.tasks.find((x) => x.id === depId);
+        return dep && dep.status !== "done" && dep.status !== "cancelled";
+      });
+
+    switch (action) {
+      case "claim": {
+        if (t.assignee && t.assignee !== actor.id) demoError(403, "not_assignee", `task is assigned to ${t.assignee}`, t);
+        if (t.status === "proposed") demoError(409, "not_accepted", "task is still a proposal awaiting human approval", t);
+        if (t.status === "claimed" && (t.lease_until || 0) >= now && t.claimed_by !== actor.id) {
+          demoError(409, "already_claimed", `task is claimed by ${t.claimed_by}`, t);
+        }
+        if (t.status === "todo" && hasOpenDeps()) demoError(409, "blocked_by_deps", "task has unfinished dependencies", t);
+        if (!["todo", "claimed"].includes(t.status)) demoError(409, "invalid_state", `cannot claim a task in status ${t.status}`, t);
+
+        const reclaim = t.status === "claimed" && t.claimed_by === actor.id;
+        t.status = "claimed";
+        t.claimed_by = actor.id;
+        t.lease_until = now + 30 * min;
+        t.version += 1;
+        t.updated_at = now;
+        if (!reclaim) pushEvent(t, "claimed", prev, "claimed", null);
+        break;
+      }
+      case "heartbeat": {
+        if (t.status !== "claimed" || t.claimed_by !== actor.id) demoError(409, "not_holder", "you do not hold this task", t);
+        t.lease_until = now + 30 * min;
+        t.updated_at = now;
+        break;
+      }
+      case "release": {
+        if (t.status !== "claimed" || t.claimed_by !== actor.id) demoError(409, "not_holder", "you do not hold this task", t);
+        t.status = "todo";
+        t.claimed_by = null;
+        t.lease_until = null;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "released", prev, "todo", body.note || null);
+        break;
+      }
+      case "block": {
+        if (t.status !== "claimed" || t.claimed_by !== actor.id) demoError(409, "not_holder", "you do not hold this task", t);
+        const q = String(body.question || "").trim();
+        if (!q) demoError(400, "bad_request", "question is required");
+        t.status = "blocked";
+        t.assignee = t.assignee || actor.id;
+        t.claimed_by = null;
+        t.lease_until = null;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "blocked", prev, "blocked", q);
+        break;
+      }
+      case "submit": {
+        if (t.status !== "claimed" || t.claimed_by !== actor.id) demoError(409, "not_holder", "you do not hold this task", t);
+        const summary = String(body.summary || "").trim();
+        if (!summary) demoError(400, "bad_request", "summary is required");
+        if (Array.isArray(body.artifacts)) {
+          for (const a of body.artifacts) {
+            if (a?.url) {
+              t.artifacts.push({
+                id: demoId("ART"),
+                task_id: t.id,
+                kind: a.kind || "url",
+                url: a.url,
+                note: a.note || null,
+                created_by: actor.id,
+                created_at: now,
+              });
+            }
+          }
+        }
+        t.status = "review";
+        t.lease_until = null;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "submitted", prev, "review", summary);
+        break;
+      }
+      case "artifacts": {
+        if (!isHuman && !(t.status === "claimed" && t.claimed_by === actor.id)) {
+          demoError(409, "not_holder", "only the holder can attach artifacts", t);
+        }
+        for (const a of body.artifacts || []) {
+          t.artifacts.push({
+            id: demoId("ART"),
+            task_id: t.id,
+            kind: a.kind || "url",
+            url: a.url,
+            note: a.note || null,
+            created_by: actor.id,
+            created_at: now,
+          });
+        }
+        saveDemoStore(store);
+        return clone({ artifacts: t.artifacts });
+      }
+      case "comments": {
+        const text = String(body.body || "").trim();
+        if (!text) demoError(400, "bad_request", "body is required");
+        if (t.status === "blocked" && isHuman) {
+          t.status = "todo";
+          t.version += 1;
+          t.updated_at = now;
+          pushEvent(t, "answered", prev, "todo", text);
+        } else {
+          pushEvent(t, "commented", null, null, text);
+        }
+        break;
+      }
+      case "accept": {
+        if (!isHuman) demoError(403, "human_only", "only a human can accept proposals");
+        if (t.status !== "proposed") demoError(422, "invalid_transition", "not in proposed status", t);
+        t.status = "todo";
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "accepted", prev, "todo", body.note || null);
+        break;
+      }
+      case "approve": {
+        if (!isHuman) demoError(403, "human_only", "only a human can approve");
+        if (t.status !== "review") demoError(422, "invalid_transition", "not in review status", t);
+        t.status = "done";
+        t.closed_at = now;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "approved", prev, "done", body.note || null);
+        break;
+      }
+      case "reject": {
+        if (!isHuman) demoError(403, "human_only", "only a human can reject");
+        if (t.status !== "review") demoError(422, "invalid_transition", "not in review status", t);
+        const fb = String(body.feedback || "").trim();
+        if (!fb) demoError(400, "bad_request", "feedback is required");
+        t.status = "todo";
+        t.assignee = t.assignee || t.claimed_by;
+        t.claimed_by = null;
+        t.lease_until = null;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "rejected", prev, "todo", fb);
+        break;
+      }
+      case "complete": {
+        if (!isHuman) demoError(403, "human_only", "only a human can complete tasks directly");
+        if (!["todo", "claimed", "blocked", "review"].includes(t.status)) {
+          demoError(422, "invalid_transition", `cannot complete a task in status ${t.status}`, t);
+        }
+        t.status = "done";
+        t.lease_until = null;
+        t.closed_at = now;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "completed", prev, "done", body.note || null);
+        break;
+      }
+      case "cancel": {
+        const ownProp = t.status === "proposed" && t.created_by === actor.id;
+        if (!isHuman && !ownProp) demoError(403, "forbidden", "agents can only cancel their own proposals", t);
+        if (["done", "cancelled"].includes(t.status)) demoError(422, "invalid_transition", "already closed", t);
+        t.status = "cancelled";
+        t.claimed_by = null;
+        t.lease_until = null;
+        t.closed_at = now;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "cancelled", prev, "cancelled", body.reason || null);
+        break;
+      }
+      case "reopen": {
+        if (!isHuman) demoError(403, "human_only", "only a human can reopen");
+        if (!["done", "cancelled"].includes(t.status)) demoError(422, "invalid_transition", "not closed", t);
+        t.status = "todo";
+        t.claimed_by = null;
+        t.closed_at = null;
+        t.version += 1;
+        t.updated_at = now;
+        pushEvent(t, "reopened", prev, "todo", body.reason || null);
+        break;
+      }
+      default:
+        demoError(404, "not_found", `unknown action: ${action}`);
+    }
+
+    saveDemoStore(store);
+    return clone(t);
+  }
+
+  demoError(404, "not_found", `no such demo route: ${method} ${pathname}`);
+}
+
 async function api(path, options = {}) {
+  if (IS_DEMO_MODE) {
+    return demoApi(path, options);
+  }
   const headers = new Headers(options.headers || {});
   if (IS_LOCAL_DEV && state.devActor) {
     headers.set("X-Dev-Actor", state.devActor);
@@ -399,15 +1126,19 @@ function updateSyncStatus() {
     return;
   }
   const who = `${state.me.display_name}${state.me.kind === "agent" ? " [Agent]" : ""}`;
+  if (IS_DEMO_MODE) {
+    syncEl.textContent = `(展示沙盒 · 身份: ${who})`;
+    return;
+  }
   const when = state.lastSyncAt ? ` · 上次同步: ${formatClock(state.lastSyncAt)}` : "";
   syncEl.textContent = `(身份: ${who}${when})`;
 }
 
-/* ---- 自定义本地开发身份菜单 ---- */
+/* ---- 自定义本地开发 / 展示视角切换菜单 ---- */
 function renderDevActorSwitcher() {
   const wrap = $("dev-actor-wrap");
   const menu = $("dev-actor-menu");
-  if (!IS_LOCAL_DEV) {
+  if (!CAN_SWITCH_ACTOR) {
     wrap.classList.add("hidden");
     return;
   }
@@ -435,7 +1166,7 @@ function renderDevActorSwitcher() {
           $("dev-actor-btn").setAttribute("aria-expanded", "false");
           if (state.devActor === a.id) return;
           state.devActor = a.id;
-          localStorage.setItem("todo-dev-actor", a.id);
+          setStoredActor(a.id);
           await loadAll();
         },
       }),
@@ -1983,6 +2714,20 @@ function bindEvents() {
 
   $("refresh-btn").addEventListener("click", () => loadAll());
   $("new-task-btn").addEventListener("click", () => openCreateModal());
+
+  if (IS_DEMO_MODE) {
+    $("demo-reset-btn").classList.remove("hidden");
+    $("demo-repo-link").classList.remove("hidden");
+    $("guide-note").textContent =
+      "※ 当前为 GitHub Pages 项目展示版（交互数据仅存于本地浏览器会话）：可体验批准提案、回答提问、验收打卡、切换右侧纸张与视角。";
+    $("demo-reset-btn").addEventListener("click", async () => {
+      resetDemoStore();
+      state.inlinePanels.clear();
+      state.highlightTaskId = null;
+      toast("已重置演示打卡纸");
+      await loadAll({ silent: true });
+    });
+  }
 
   $("filter-search").addEventListener("input", (e) => {
     const view = getSheetView(state.activeSheet);

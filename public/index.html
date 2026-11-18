@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TODO · 人与 Agent 共用的任务队列打卡纸</title>
   <meta name="description" content="Todo Hub：人与多个 Agent 共用的任务队列打卡纸">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;500&family=Long+Cang&family=Noto+Serif+SC:wght@400;600;700;900&display=swap">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <!-- SVG 手绘墨迹滤镜（仅作用于线条、边框与标题轮廓） -->
@@ -107,7 +107,7 @@
 
             <!-- 提示说明与当前纸张内筛选栏 -->
             <section class="intro-band">
-              <p class="guide-note">
+              <p class="guide-note" id="guide-note">
                 ※ 可在左侧 Studio 切换成员，或直接点露出的底层纸张边缘抽换纸页；标签与搜索仅过滤当前这张纸。
               </p>
 
@@ -115,6 +115,8 @@
                 <div class="sync-status">
                   <span class="sync-meta" id="sync-meta">(正在识别身份…)</span>
                   <button type="button" class="text-btn" id="refresh-btn">刷新队列</button>
+                  <button type="button" class="text-btn hidden" id="demo-reset-btn">重置演示</button>
+                  <a class="text-btn hidden" id="demo-repo-link" href="https://github.com/Aumnertic/todo-hub" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
                   <div class="dev-actor-wrap hidden" id="dev-actor-wrap">
                     <button type="button" class="dev-actor-btn" id="dev-actor-btn" aria-haspopup="listbox" aria-expanded="false">
                       视角: <span id="dev-actor-label">me</span> ▾
@@ -353,6 +355,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
